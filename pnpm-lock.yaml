@@ -9,7 +9,7 @@ dependencies:
     specifier: ^6.20.0
     version: 6.20.0
   cheerio:
-    specifier: 1.0.0-rc.12
+    specifier: ^1.0.0-rc.12
     version: 1.0.0-rc.12
   cli-progress:
     specifier: ^3.12.0
