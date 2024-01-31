@@ -1,0 +1,35 @@
+dist
+build
+release
+coverage
+node_modules
+deploy_versions
+
+Thumb.db
+.DS_Store
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+.swc
+.temp
+.rn_temp
+.idea
+.wireit
+.vscode
+.deprecated*
+
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.bak*
+*bak.*
+*.local*
+*.history*
+*.scripts*
+*_backup*
+
+*debug.log*
+*error.log*
