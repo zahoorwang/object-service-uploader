@@ -1,0 +1,92 @@
+{
+  "af-south-1": {
+    "name": "非洲-约翰内斯堡",
+    "endpoint": "obs.af-south-1.myhuaweicloud.com",
+    "protocol": "HTTPS/HTTP"
+  },
+  "cn-north-4": {
+    "name": "华北-北京四",
+    "endpoint": "obs.cn-north-4.myhuaweicloud.com",
+    "protocol": "HTTPS/HTTP"
+  },
+  "cn-north-1": {
+    "name": "华北-北京一",
+    "endpoint": "obs.cn-north-1.myhuaweicloud.com",
+    "protocol": "HTTPS/HTTP"
+  },
+  "cn-north-9": {
+    "name": "华北-乌兰察布一",
+    "endpoint": "obs.cn-north-9.myhuaweicloud.com",
+    "protocol": "HTTPS/HTTP"
+  },
+  "cn-east-2": {
+    "name": "华东-上海二",
+    "endpoint": "obs.cn-east-2.myhuaweicloud.com",
+    "protocol": "HTTPS/HTTP"
+  },
+  "cn-east-3": {
+    "name": "华东-上海一",
+    "endpoint": "obs.cn-east-3.myhuaweicloud.com",
+    "protocol": "HTTPS/HTTP"
+  },
+  "cn-south-1": {
+    "name": "华南-广州",
+    "endpoint": "obs.cn-south-1.myhuaweicloud.com",
+    "protocol": "HTTPS/HTTP"
+  },
+  "cn-south-4": {
+    "name": "华南-广州-友好用户环境",
+    "endpoint": "obs.cn-south-4.myhuaweicloud.com",
+    "protocol": "HTTPS/HTTP"
+  },
+  "la-north-2": {
+    "name": "拉美-墨西哥城二",
+    "endpoint": "obs.la-north-2.myhuaweicloud.com",
+    "protocol": "HTTPS/HTTP"
+  },
+  "na-mexico-1": {
+    "name": "拉美-墨西哥城一",
+    "endpoint": "obs.na-mexico-1.myhuaweicloud.com",
+    "protocol": "HTTPS/HTTP"
+  },
+  "sa-brazil-1": {
+    "name": "拉美-圣保罗一",
+    "endpoint": "obs.sa-brazil-1.myhuaweicloud.com",
+    "protocol": "HTTPS/HTTP"
+  },
+  "la-south-2": {
+    "name": "拉美-圣地亚哥",
+    "endpoint": "obs.la-south-2.myhuaweicloud.com",
+    "protocol": "HTTPS/HTTP"
+  },
+  "tr-west-1": {
+    "name": "土耳其-伊斯坦布尔",
+    "endpoint": "obs.tr-west-1.myhuaweicloud.com",
+    "protocol": "HTTPS/HTTP"
+  },
+  "cn-southwest-2": {
+    "name": "西南-贵阳一",
+    "endpoint": "obs.cn-southwest-2.myhuaweicloud.com",
+    "protocol": "HTTPS/HTTP"
+  },
+  "ap-southeast-2": {
+    "name": "亚太-曼谷",
+    "endpoint": "obs.ap-southeast-2.myhuaweicloud.com",
+    "protocol": "HTTPS/HTTP"
+  },
+  "ap-southeast-3": {
+    "name": "亚太-新加坡",
+    "endpoint": "obs.ap-southeast-3.myhuaweicloud.com",
+    "protocol": "HTTPS/HTTP"
+  },
+  "me-east-1": {
+    "name": "中东-利雅得",
+    "endpoint": "obs.me-east-1.myhuaweicloud.com",
+    "protocol": "HTTPS/HTTP"
+  },
+  "ap-southeast-1": {
+    "name": "中国-香港",
+    "endpoint": "obs.ap-southeast-1.myhuaweicloud.com",
+    "protocol": "HTTPS/HTTP"
+  }
+}

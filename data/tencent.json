@@ -1,0 +1,78 @@
+{
+  "ap-beijing-1": {
+    "name": "北京一区",
+    "domain": "<BucketName-APPID>.cos.ap-beijing-1.myqcloud.com"
+  },
+  "ap-beijing": {
+    "name": "北京",
+    "domain": "<BucketName-APPID>.cos.ap-beijing.myqcloud.com"
+  },
+  "ap-nanjing": {
+    "name": "南京",
+    "domain": "<BucketName-APPID>.cos.ap-nanjing.myqcloud.com"
+  },
+  "ap-shanghai": {
+    "name": "上海",
+    "domain": "<BucketName-APPID>.cos.ap-shanghai.myqcloud.com"
+  },
+  "ap-guangzhou": {
+    "name": "广州",
+    "domain": "<BucketName-APPID>.cos.ap-guangzhou.myqcloud.com"
+  },
+  "ap-chengdu": {
+    "name": "成都",
+    "domain": "<BucketName-APPID>.cos.ap-chengdu.myqcloud.com"
+  },
+  "ap-chongqing": {
+    "name": "重庆",
+    "domain": "<BucketName-APPID>.cos.ap-chongqing.myqcloud.com"
+  },
+  "ap-hongkong": {
+    "name": "中国香港",
+    "domain": "<BucketName-APPID>.cos.ap-hongkong.myqcloud.com"
+  },
+  "ap-singapore": {
+    "name": "新加坡",
+    "domain": "<BucketName-APPID>.cos.ap-singapore.myqcloud.com"
+  },
+  "ap-mumbai": {
+    "name": "孟买",
+    "domain": "<BucketName-APPID>.cos.ap-mumbai.myqcloud.com"
+  },
+  "ap-jakarta": {
+    "name": "雅加达",
+    "domain": "<BucketName-APPID>.cos.ap-jakarta.myqcloud.com"
+  },
+  "ap-seoul": {
+    "name": "首尔",
+    "domain": "<BucketName-APPID>.cos.ap-seoul.myqcloud.com"
+  },
+  "ap-bangkok": {
+    "name": "曼谷",
+    "domain": "<BucketName-APPID>.cos.ap-bangkok.myqcloud.com"
+  },
+  "ap-tokyo": {
+    "name": "东京",
+    "domain": "<BucketName-APPID>.cos.ap-tokyo.myqcloud.com"
+  },
+  "na-siliconvalley": {
+    "name": "硅谷（美西）",
+    "domain": "<BucketName-APPID>.cos.na-siliconvalley.myqcloud.com"
+  },
+  "na-ashburn": {
+    "name": "弗吉尼亚（美东）",
+    "domain": "<BucketName-APPID>.cos.na-ashburn.myqcloud.com"
+  },
+  "na-toronto": {
+    "name": "多伦多",
+    "domain": "<BucketName-APPID>.cos.na-toronto.myqcloud.com"
+  },
+  "sa-saopaulo": {
+    "name": "圣保罗",
+    "domain": "<BucketName-APPID>.cos.sa-saopaulo.myqcloud.com"
+  },
+  "eu-frankfurt": {
+    "name": "法兰克福",
+    "domain": "<BucketName-APPID>.cos.eu-frankfurt.myqcloud.com"
+  }
+}
