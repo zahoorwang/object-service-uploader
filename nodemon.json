@@ -1,0 +1,10 @@
+{
+  "ext": "ts,json",
+  "delay": 500,
+  "watch": ["*.ts"],
+  "restartable": "rs",
+  "env": { "NODE_ENV": "development", "NODE_OPTIONS": "--experimental-specifier-resolution=node" },
+  "execMap": { "ts": "ts-node-esm" },
+  "ignore": ["**/test/**", "**/docs/**", "**/*bak*", "node_modules"],
+  "verbose": true
+}

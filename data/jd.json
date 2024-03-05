@@ -1,0 +1,26 @@
+{
+  "cn-north-1": {
+    "name": "华北-北京",
+    "endpoint": "s3.cn-north-1.jdcloud-oss.com",
+    "internal": "s3-internal.cn-north-1.jdcloud-oss.com",
+    "protocol": "http/https"
+  },
+  "cn-east-1": {
+    "name": "华东-宿迁",
+    "endpoint": "s3.cn-east-1.jdcloud-oss.com",
+    "internal": "s3-internal.cn-east-1.jdcloud-oss.com",
+    "protocol": "http/https"
+  },
+  "cn-east-2": {
+    "name": "华东-上海",
+    "endpoint": "s3.cn-east-2.jdcloud-oss.com",
+    "internal": "s3-internal.cn-east-2.jdcloud-oss.com",
+    "protocol": "http/https"
+  },
+  "cn-south-1": {
+    "name": "华南-广州",
+    "endpoint": "s3.cn-south-1.jdcloud-oss.com",
+    "internal": "s3-internal.cn-south-1.jdcloud-oss.com",
+    "protocol": "http/https"
+  }
+}
