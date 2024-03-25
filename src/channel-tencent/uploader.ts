@@ -3,6 +3,7 @@ import path from 'node:path';
 import PQueue from 'p-queue';
 import Client, { UploadFileParams } from 'cos-nodejs-sdk-v5';
 
+import { omit } from '../cli/utils';
 import { fail, warn } from '../core/echo';
 import { Uploader } from '../core/uploader';
 
@@ -17,6 +18,8 @@ type TencentPutPrepare = {
   accessPathProcessor?: (options: { file: string; name?: string; access?: string }) => string;
   options?: Omit<UploadFileParams, 'Bucket' | 'Region' | 'FilePath' | 'Key'>;
 };
+
+const regex = /\S+\.cos\.\S+\.myqcloud\.com/i;
 
 export class TencentUploader extends Uploader<Tencent.Options, TencentPutPrepare> implements Uploader<Tencent.Options, TencentPutPrepare> {
   public constructor(options?: Partial<Tencent.Options>) {
@@ -86,12 +89,18 @@ export class TencentUploader extends Uploader<Tencent.Options, TencentPutPrepare
     });
     await objects.before?.();
 
-    const client = new Client({
-      ...this.options,
-      ChunkRetryTimes: objects.retry ?? this.options.ChunkRetryTimes,
-      FileParallelLimit: objects.concurrency ?? this.options.FileParallelLimit,
-      ChunkParallelLimit: objects.concurrency ?? this.options.ChunkParallelLimit
-    });
+    const client = new Client(
+      omit(
+        {
+          ...this.options,
+          Domain: '{Bucket}.cos.{Region}.myqcloud.com',
+          ChunkRetryTimes: objects.retry ?? this.options.ChunkRetryTimes,
+          FileParallelLimit: objects.concurrency ?? this.options.FileParallelLimit,
+          ChunkParallelLimit: objects.concurrency ?? this.options.ChunkParallelLimit
+        },
+        ['Bucket', 'Region']
+      )
+    );
     const queue = new PQueue({ concurrency: objects.concurrency ?? this.options.FileParallelLimit, autoStart: false });
     objects.files.forEach(it => queue.add(() => this.#_upload(client, (it.options as any)!)), void 0);
 
@@ -116,13 +125,19 @@ export class TencentUploader extends Uploader<Tencent.Options, TencentPutPrepare
 
   async #_upload(client: Client, options: UploadFileParams) {
     const protocol = (this.options.Protocol || 'http').replace(/:$/, '');
+    const location = (value: string) => {
+      if (this.options.Domain && !regex.test(this.options.Domain)) {
+        return value.replace(regex, this.options.Domain);
+      }
+      return value;
+    };
     const result = await client
       .uploadFile(options)
       .then(response => {
         // @ts-ignore
         // url 响应结果为当 Client 中的 Domain 属性值为指定值时
         const { Location, url } = response;
-        return { file: options.FilePath, name: options.Key, link: url ? url : `${protocol}://${Location}`, error: false };
+        return { file: options.FilePath, name: options.Key, link: url ? url : `${protocol}://${location(Location)}`, error: false };
       })
       .catch(error => ({ file: options.FilePath, name: options.Key, link: '', error }));
     return result;
@@ -137,6 +152,6 @@ export class TencentUploader extends Uploader<Tencent.Options, TencentPutPrepare
     const hasRegion = Object.keys(endpoint.data).includes(value || '');
     if (!hasRegion) return console.log(warn(`"${value}" not in TencentUploader region/domain`));
     this.property('Region', value);
-    endpoint.has(this.get('Domain') || '') && this.property('Domain', endpoint.get(value!));
+    this.options.Domain || this.property('Domain', '{Bucket}.cos.{Region}.myqcloud.com');
   }
 }

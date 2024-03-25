@@ -1,4 +1,5 @@
 import { globby } from 'globby';
+import chalk from 'chalk-template';
 import { SingleBar } from 'cli-progress';
 import { Command, Option } from 'commander';
 
@@ -63,7 +64,7 @@ export function commandify() {
             result.error && errors.push(result);
 
             if (progress === 'list') {
-              result.error || console.log(succ(`Done: ${result.file} ==> ${result.link}`));
+              result.error || console.log(succ(`Done: ${chalk`{gray ${result.file}}`} ==> ${chalk`{white ${result.link}}`}`));
             } else {
               bar?.update(index);
               index === total && bar?.stop();
@@ -73,7 +74,7 @@ export function commandify() {
         .catch(error => console.log(typeof error === 'string' ? error : error.message));
 
       printf('');
-      errors.length && printf(...errors.map(it => warn(`Not Upload: ${it.file}`)), '');
+      errors.length && printf(...errors.map(it => warn(`Not Upload: ${it.file} ${chalk`{#c91f37 ${it.error}}`}`)), '');
     });
 
   return cos;

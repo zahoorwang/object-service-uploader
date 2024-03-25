@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env node --no-warnings=ExperimentalWarning
 
 import { join } from 'node:path';
 import { statSync as stat, existsSync as exists } from 'node:fs';

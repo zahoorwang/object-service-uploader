@@ -28,3 +28,9 @@ export const single = (name: string) => {
     hideCursor: true
   });
 };
+
+export const omit = <T extends Record<PropertyKey, unknown>, F extends (keyof T)[]>(value: T, props: F): Omit<T, F[number]> => {
+  const result = { ...value };
+  props.forEach(prop => delete result[prop]);
+  return result;
+};
