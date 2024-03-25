@@ -9,7 +9,7 @@ import { Uploader } from '../core/uploader';
 
 import { AliEndpoint } from './endpoint';
 
-type PutPrepare = {
+type AliPutPrepare = {
   file: string;
   name?: string;
   access?: string;
@@ -17,7 +17,7 @@ type PutPrepare = {
   options?: PutObjectOptions;
 };
 
-export class AliUploader extends Uploader<Options, PutPrepare> implements Uploader<Options, PutPrepare> {
+export class AliUploader extends Uploader<Options, AliPutPrepare> implements Uploader<Options, AliPutPrepare> {
   public constructor(options?: Partial<Options>) {
     super({
       accessKeyId: '',
@@ -38,14 +38,14 @@ export class AliUploader extends Uploader<Options, PutPrepare> implements Upload
     this.ensure('timeout', this.#_timeout);
   }
 
-  public putting(files: string[]): Promise<Uploader.RPut[]>;
-  public putting(options: Uploader.Put<PutPrepare>): Promise<Uploader.RPut[]>;
-  public async putting(options: unknown): Promise<Uploader.RPut[]> {
+  public override putting(files: string[]): Promise<Uploader.RPut[]>;
+  public override putting(options: Uploader.Put<AliPutPrepare>): Promise<Uploader.RPut[]>;
+  public override async putting(options: unknown): Promise<Uploader.RPut[]> {
     if (!this.options.accessKeyId) throw new Error(fail(`AliUploader required "accessKeyId" option`));
     if (!this.options.accessKeySecret) throw new Error(fail(`AliUploader required "accessKeySecret" option`));
     if (!this.options.region && !this.options.endpoint) throw new Error(fail(`AliUploader required "region" or "endpoint" option`));
 
-    const objects: Uploader.Put<PutPrepare> = Array.isArray(options) ? { files: options } : (options as Uploader.Put<PutPrepare>);
+    const objects: Uploader.Put<AliPutPrepare> = Array.isArray(options) ? { files: options } : (options as Uploader.Put<AliPutPrepare>);
 
     if (!objects.files.length) return console.log(warn(`no upload, the list of files is empty`)), [];
 
@@ -55,7 +55,6 @@ export class AliUploader extends Uploader<Options, PutPrepare> implements Upload
     objects.accessPathProcessor ??= ({ file, name, access }) => {
       return (name || path.posix.normalize(path.join(access || '', path.relative(process.cwd(), file)))).replace(/^\//, '');
     };
-
     objects.files = objects.files.map(it => {
       if (typeof it === 'string') {
         return { file: it, name: objects.accessPathProcessor?.({ name: '', file: it, access: objects.access! }) };
@@ -65,6 +64,7 @@ export class AliUploader extends Uploader<Options, PutPrepare> implements Upload
         return { file: it.file, name: accessPathProcessor({ file: it.file, name: it.name, access })!, options: it.options };
       }
     });
+    await objects.before?.();
 
     // @ts-ignore
     // retryMax 是 OSS Client 的属性，没有在 d.ts 文件描述，源码中翻出来的

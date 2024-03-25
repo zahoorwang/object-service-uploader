@@ -1,99 +1,142 @@
+import path from 'node:path';
+
 import PQueue from 'p-queue';
-import Client from 'cos-nodejs-sdk-v5';
-import { red, yellow, italic, gray, inverse } from 'picocolors';
+import Client, { UploadFileParams } from 'cos-nodejs-sdk-v5';
 
-import { cpus } from '@utils/cpu';
-import { Uploader } from '@core/uploader';
-import { silent, fail, warn } from '@utils/logger';
+import { fail, warn } from '../core/echo';
+import { Uploader } from '../core/uploader';
 
-import { Endpoint } from './endpoint';
+import { TencentEndpoint } from './endpoint';
 
-export type TencentUploaderOptions = Client.COSOptions & Partial<Pick<Client.UploadFileParams, 'Bucket' | 'Region'>>;
+type TencentPutPrepare = {
+  file: string;
+  name?: string;
+  access?: string;
+  bucket?: string;
+  region?: string;
+  accessPathProcessor?: (options: { file: string; name?: string; access?: string }) => string;
+  options?: Omit<UploadFileParams, 'Bucket' | 'Region' | 'FilePath' | 'Key'>;
+};
 
-export default class TencentUploader
-  extends Uploader<TencentUploaderOptions, Endpoint>
-  implements UploaderProcessor<TencentUploaderOptions, Partial<Client.UploadFileParams>, Endpoint>
-{
-  #_endpoint: Endpoint = new Endpoint();
+export class TencentUploader extends Uploader<Tencent.Options, TencentPutPrepare> implements Uploader<Tencent.Options, TencentPutPrepare> {
+  public constructor(options?: Partial<Tencent.Options>) {
+    super({
+      SecretId: '',
+      SecretKey: '',
+      Protocol: 'https',
+      Timeout: 60000,
+      FileParallelLimit: 1,
+      ChunkParallelLimit: 1,
+      ChunkRetryTimes: 0,
+      ChunkSize: 1024 * 1024 * 8,
+      Proxy: '',
+      Bucket: '',
+      Region: 'ap-beijing',
+      Domain: '{Bucket}.cos.{Region}.myqcloud.com',
+      ...options
+    });
 
-  #_options: UploaderOptions<TencentUploaderOptions> = { SecretId: '', SecretKey: '' };
-
-  constructor(args: Partial<UploaderOptions<TencentUploaderOptions>> = {}) {
-    super();
-    this.setOptions(args);
+    this.ensure('Timeout', this.#_timeout);
+    this.ensure('Region', this.#_region);
   }
 
-  public override get endpoint() {
-    return this.#_endpoint;
-  }
+  public override putting(files: string[]): Promise<Uploader.RPut[]>;
+  public override putting(options: Uploader.Put<TencentPutPrepare>): Promise<Uploader.RPut[]>;
+  public override async putting(options: unknown): Promise<Uploader.RPut[]> {
+    if (!this.options.SecretId) throw new Error(fail(`TencentUploader required "SecretId" option`));
+    if (!this.options.SecretKey) throw new Error(fail(`TencentUploader required "SecretKey" option`));
 
-  async #upload(client: Client, options: UploaderPutHandle<Partial<Client.UploadFileParams>>): Promise<UploaderUploaded> {
-    const { file, root, name: filename, Key, ...opts } = { root: '', ...options };
-    const name = this.bucketify({ cwd: this.#_options.cwd!, file, root, name: Key || filename });
-    const protocol = (this.#_options.Protocol || 'http').replace(/:$/, '');
+    const objects: Uploader.Put<TencentPutPrepare> = Array.isArray(options) ? { files: options } : (options as Uploader.Put<TencentPutPrepare>);
 
-    const result = await client
-      .uploadFile({ ...opts, Key: name } as any)
-      .then(response => ({ file, name, link: `${protocol}://${response.Location}`, error: false }))
-      .catch(error => {
-        silent(red(error));
-        warn(yellow(`TencentUploader failed to upload file "${file}"`));
-        return { file, name: name.replace(/^\//, ''), link: '', error: true };
+    if (!objects.files.length) return console.log(warn(`no upload, the list of files is empty`)), [];
+
+    objects.access = objects.access ?? '';
+    'retry' in objects && (objects.retry = Math.round(Math.max(objects.retry ?? 0, 0)));
+    'concurrency' in objects && (objects.concurrency = Math.round(Math.max(objects.concurrency ?? 1, 1)));
+    objects.accessPathProcessor ??= ({ file, name, access }) => {
+      return (name || path.posix.normalize(path.join(access || '', path.relative(process.cwd(), file)))).replace(/^\//, '');
+    };
+    objects.files = objects.files.map(it => {
+      if (typeof it === 'string') {
+        return {
+          file: it,
+          options: {
+            Bucket: this.options.Bucket,
+            Region: this.options.Region,
+            Key: objects.accessPathProcessor?.({ name: '', file: it, access: objects.access! }),
+            FilePath: it
+          } as any
+        };
+      } else {
+        const Bucket = it.bucket ?? this.options.Bucket ?? '';
+        const Region = it.region ?? this.options.Region ?? '';
+        const access = it.access ?? objects.access ?? '';
+        const accessPathProcessor = (it.accessPathProcessor ?? objects.accessPathProcessor)!;
+        return {
+          file: it.file,
+          options: {
+            ...it.options,
+            Bucket,
+            Region,
+            Key: accessPathProcessor({ file: it.file, name: it.name, access }),
+            FilePath: it.file
+          } as any
+        };
+      }
+    });
+    await objects.before?.();
+
+    const client = new Client({
+      ...this.options,
+      ChunkRetryTimes: objects.retry ?? this.options.ChunkRetryTimes,
+      FileParallelLimit: objects.concurrency ?? this.options.FileParallelLimit,
+      ChunkParallelLimit: objects.concurrency ?? this.options.ChunkParallelLimit
+    });
+    const queue = new PQueue({ concurrency: objects.concurrency ?? this.options.FileParallelLimit, autoStart: false });
+    objects.files.forEach(it => queue.add(() => this.#_upload(client, (it.options as any)!)), void 0);
+
+    const progressing = () => {
+      return new Promise<Uploader.RPut[]>(resolve => {
+        let completed = 0;
+        const total = queue.size;
+        const results: Uploader.RPut[] = [];
+
+        queue.on('completed', (result: Uploader.RPut) => {
+          completed += 1;
+          results.push(result);
+          objects.puttingProgress?.(completed, total, result);
+          completed === total && resolve(results);
+        });
+        queue.start();
       });
+    };
 
+    return await progressing();
+  }
+
+  async #_upload(client: Client, options: UploadFileParams) {
+    const protocol = (this.options.Protocol || 'http').replace(/:$/, '');
+    const result = await client
+      .uploadFile(options)
+      .then(response => {
+        // @ts-ignore
+        // url 响应结果为当 Client 中的 Domain 属性值为指定值时
+        const { Location, url } = response;
+        return { file: options.FilePath, name: options.Key, link: url ? url : `${protocol}://${Location}`, error: false };
+      })
+      .catch(error => ({ file: options.FilePath, name: options.Key, link: '', error }));
     return result;
   }
 
-  public async putting(file: string): Promise<void | UploaderUploaded>;
-  public async putting(files: string[]): Promise<void | UploaderUploaded[]>;
-  public async putting(object: UploaderPutHandle<Partial<Client.UploadFileParams>>): Promise<void | UploaderUploaded>;
-  public async putting(objects: UploaderPutHandle<Partial<Client.UploadFileParams>>[]): Promise<void | UploaderUploaded[]>;
-  public async putting(value: unknown): Promise<any> {
-    if (!this.#_options.SecretId) return fail(italic(red(`TencentUploader required ${inverse('SecretId')} option`)));
-    if (!this.#_options.SecretKey) return fail(italic(red(`TencentUploader required ${inverse('SecretKey')} option`)));
-
-    const multiple = Array.isArray(value);
-    const objects: UploaderPutHandle<Client.UploadFileParams>[] = (multiple ? value : [value]).map(it =>
-      typeof it === 'string'
-        ? { file: it, FilePath: it, Bucket: this.#_options.Bucket, Region: this.#_options.Region }
-        : { Bucket: it.Bucket || this.#_options.Bucket, Region: it.Region || this.#_options.Region, ...it, file: it.FilePath || it.file, FilePath: it.FilePath || it.file }
-    );
-    objects.forEach(o => silent(`${inverse(yellow('CBS'))} Found file: ${gray(o.file)}`));
-    if (objects.length) {
-      const { cwd: _, root, retry: __, concurrency, Bucket: ___, Region: ____, ...options } = this.#_options;
-      const client = new Client(options);
-      const queue = new PQueue({ concurrency, autoStart: false });
-      objects.forEach(it => (queue.add(() => this.#upload(client, { root: it.root ?? root, ...it })), void 0));
-      const result = await this.progressing('COS', queue);
-      return multiple ? result : result?.[0];
-    } else {
-      warn(yellow(`TencentUploader is not running and no files have been uploaded`));
-    }
+  #_timeout(value: Uploader.Value<Tencent.Options, 'Timeout'>) {
+    this.property('Timeout', Math.round(Math.max(value || 0, 0)));
   }
 
-  public override setOptions(options: Partial<UploaderOptions<TencentUploaderOptions>> = {}): void {
-    this.#_options = {
-      cwd: process.cwd(),
-      root: '',
-      retry: 0,
-      concurrency: 1,
-      Protocol: 'https',
-      Timeout: 60000,
-      ChunkParallelLimit: 8,
-      ChunkSize: 1024 * 1024 * 8,
-      Proxy: '',
-      ...this.#_options,
-      ...options
-    };
-
-    const region = this.#_options.Region || 'ap-beijing';
-    const bucket = this.#_options.Bucket || '';
-    const retry = Math.floor(this.#_options.retry || 0);
-    const concurrency = Math.floor(this.#_options.concurrency || 1);
-
-    this.#_options.Region = region;
-    this.#_options.Bucket = bucket;
-    this.#_options.retry = this.#_options.ChunkRetryTimes = retry < 0 ? 0 : retry;
-    this.#_options.concurrency = this.#_options.FileParallelLimit = concurrency < 1 ? 1 : cpus < concurrency ? cpus : concurrency;
+  #_region(value: Uploader.Value<Tencent.Options, 'Region'>) {
+    const endpoint = new TencentEndpoint();
+    const hasRegion = Object.keys(endpoint.data).includes(value || '');
+    if (!hasRegion) return console.log(warn(`"${value}" not in TencentUploader region/domain`));
+    this.property('Region', value);
+    endpoint.has(this.get('Domain') || '') && this.property('Domain', endpoint.get(value!));
   }
 }

@@ -1,83 +1,54 @@
-import { normalize, resolve } from 'node:path';
+import { resolve } from 'node:path';
 
-import got from 'got';
-import table from 'tty-table';
-import { gray } from 'picocolors';
-import * as cheerio from 'cheerio';
+import { load as htmlify } from 'cheerio';
 
-import { reader } from '@utils/reader';
-import { writer } from '@utils/writer';
+import { Endpoint } from '../core/endpoint';
+import { jsonify, tableify } from '../core/formatter';
 
-type Cached = {
-  name: string;
-  domain: string;
-};
+export class TencentEndpoint extends Endpoint<Tencent.Struct> implements Endpoint<Tencent.Struct> {
+  static #_inst: TencentEndpoint;
 
-export class Endpoint implements EndpointProcessor {
-  private static _instance: Endpoint | null = null;
+  public constructor() {
+    if (TencentEndpoint.#_inst) return TencentEndpoint.#_inst;
 
-  public readonly REMOTE: string = 'https://cloud.tencent.com/document/product/436/6224';
-
-  private readonly LOCAL: string = normalize(resolve(__dirname, '../../', 'data/tencent.json'));
-
-  #_cache: { [region: string]: Cached } = {};
-
-  #_header: table.Header[] = [
-    { value: 'Name', color: 'magenta', headerColor: 'magenta', align: 'left', headerAlign: 'left' },
-    { value: 'Region', color: 'yellow', headerColor: 'yellow', align: 'left', headerAlign: 'left' },
-    { value: 'Domain', color: 'blue', headerColor: 'blue', align: 'left', headerAlign: 'left' }
-  ];
-
-  constructor() {
-    return (Endpoint._instance ??= (this.#local(), this));
+    super(
+      resolve(import.meta.dirname, '../../data', 'tencent.json'), //
+      'https://cloud.tencent.com/document/product/436/6224' //
+    );
+    return (TencentEndpoint.#_inst = this);
   }
 
-  #local(): void {
-    this.#_cache = reader(this.LOCAL, 'json');
+  public override get(region: string): string {
+    return this.data[region]?.domain ?? '';
   }
 
-  public get(region: string): string {
-    return this.#_cache[region]?.domain ?? '';
+  public override has(endpoint: string): boolean {
+    return !Object.values(this.data)
+      .map(it => /(\S+).cos.(\S+).myqcloud.com/gi.test(endpoint))
+      .includes(false);
   }
 
-  public output(format: 'table' | 'json' = 'table') {
-    const list = Object.entries(this.#_cache).map(([region, data]) => {
-      const { name, domain } = data;
-      return { name, region, domain };
-    });
-
-    if (format === 'json') {
-      console.log(list);
-    } else {
-      const columns = list.map(({ name, region, domain }) => [name, region, domain || gray('不支持')]);
-      console.log(table(this.#_header, columns).render());
-      console.log(gray(`\n   Table data from: ${this.REMOTE}\n`));
-    }
+  public override printf(format: 'table' | 'json' = 'table'): string {
+    return format === 'table'
+      ? tableify<Tencent.Struct>(this.data, ['Name', 'Region', 'Domain'], ([region, { name, domain }]) => [name, region, domain])
+      : jsonify<Tencent.Struct>(this.data, ([region, { name, domain }]) => ({ name, region, domain }));
   }
 
-  public async remote(): Promise<void> {
-    const html = (await got.get(this.REMOTE).catch(() => ({ body: '' }))).body;
-    if (!html) return;
+  protected override async parsing(html: string): Promise<Endpoint.Mapped<Tencent.Struct>> {
+    const data: Endpoint.Mapped<Tencent.Struct> = {};
 
-    const $ = cheerio.load(html);
-    const data: { [region: string]: Cached } = {};
-
+    const $ = htmlify(html);
     $('div.table-container table > tbody > tr').each((_, el) => {
       const [, , name, region, domain] = $(el)
         .find('td')
         .map((__, td) => $(td).text().replace('（已售罄）', ''))
         .toArray();
 
-      if (!(region.includes('地域简称') || name.includes('金融'))) {
-        data[region] = { name, domain };
-      }
+      if (region.includes('地域简称') || name.includes('金融')) return;
+
+      data[region] = { name, domain };
     });
 
-    this.#_cache = data;
-  }
-
-  public async synchronize(): Promise<void> {
-    await this.remote();
-    writer(this.LOCAL, JSON.stringify(this.#_cache, null, 2));
+    return data;
   }
 }

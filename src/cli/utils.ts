@@ -2,7 +2,7 @@ import { Help } from 'commander';
 import chalk from 'chalk-template';
 import { SingleBar } from 'cli-progress';
 
-export const is = (value: any): value is CommandModule => !['name', 'intro', 'commandify'].map(prop => prop in value).includes(false);
+export const is = (value: any): value is CommandModule => !['name', 'intro', 'commandify', 'Endpoint', 'Uploader'].map(prop => prop in value).includes(false);
 
 export const configure: Partial<Help> = {
   optionTerm(option) {
@@ -20,13 +20,11 @@ export const colorintro = (list: string[]) => (list.length ? [`Vendor support:`,
 
 export const printf = Object.assign((...args: string[]) => args.map(it => console.log(it)), { EMPTY: '' });
 
-export const single = (name: string, total: number) => {
-  const bar = new SingleBar({
+export const single = (name: string) => {
+  return new SingleBar({
     format: chalk`{#c91f37 ${name.toUpperCase()}}` + chalk` {#4c8dae ${'{bar}'}}` + ` | {percentage}% | {value}/{total} files uploaded`,
     barCompleteChar: '\u2588',
     barIncompleteChar: '\u2591',
     hideCursor: true
   });
-
-  return bar.start(total, 0), bar;
 };

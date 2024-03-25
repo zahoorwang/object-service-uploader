@@ -1,6 +1,6 @@
 {
   "ext": "ts,json",
-  "delay": 3000,
+  "delay": 2000,
   "watch": ["*.ts"],
   "restartable": "rs",
   "env": { "NODE_ENV": "development", "NODE_OPTIONS": "--experimental-specifier-resolution=node" },
