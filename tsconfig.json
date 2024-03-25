@@ -12,13 +12,15 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "moduleResolution": "node",
-    "experimentalDecorators": false,
+    "experimentalDecorators": true,
+    "allowArbitraryExtensions": true,
     "useUnknownInCatchVariables": false,
     "allowSyntheticDefaultImports": true,
 
+    "rootDir": "src",
     "outDir": "dist"
   },
-  "include": ["src/**/*.ts", "types/**/*.d.ts"],
+  "include": ["src/**/*", "types/**/*"],
   "exclude": ["node_modules", "dist"],
 
   "ts-node": {

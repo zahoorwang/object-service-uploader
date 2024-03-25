@@ -1,86 +1,131 @@
-import Client from 'ali-oss';
+import path from 'node:path';
+
+import ms from 'ms';
 import PQueue from 'p-queue';
-import { red, yellow, italic, gray, inverse } from 'picocolors';
+import Client, { Options, PutObjectOptions } from 'ali-oss';
 
-import { cpus } from '@utils/cpu';
-import { Uploader } from '@core/uploader';
-import { silent, fail, warn } from '@utils/logger';
+import { fail, warn } from '../core/echo';
+import { Uploader } from '../core/uploader';
 
-import { Endpoint } from './endpoint';
+import { AliEndpoint } from './endpoint';
 
-export type AliUploaderOptions = Client.Options;
+type PutPrepare = {
+  file: string;
+  name?: string;
+  access?: string;
+  accessPathProcessor?: (options: { file: string; name?: string; access?: string }) => string;
+  options?: PutObjectOptions;
+};
 
-export default class AliUploader extends Uploader<AliUploaderOptions, Endpoint> implements UploaderProcessor<AliUploaderOptions, Client.PutObjectOptions, Endpoint> {
-  #_endpoint: Endpoint = new Endpoint();
+export class AliUploader extends Uploader<Options, PutPrepare> implements Uploader<Options, PutPrepare> {
+  public constructor(options?: Partial<Options>) {
+    super({
+      accessKeyId: '',
+      accessKeySecret: '',
+      bucket: '',
+      region: 'oss-cn-hangzhou',
+      internal: false,
+      endpoint: new AliEndpoint().get('oss-cn-hangzhou', false),
+      secure: true,
+      timeout: 60000,
+      cname: false,
+      ...options
+    });
 
-  #_options: UploaderOptions<AliUploaderOptions> = { accessKeyId: '', accessKeySecret: '' };
-
-  constructor(args: Partial<UploaderOptions<AliUploaderOptions>> = {}) {
-    super();
-    this.setOptions(args);
+    this.ensure('region', this.#_region);
+    this.ensure('internal', this.#_internal);
+    this.ensure('endpoint', this.#_endpoint);
+    this.ensure('timeout', this.#_timeout);
   }
 
-  public override get endpoint() {
-    return this.#_endpoint;
+  public putting(files: string[]): Promise<Uploader.RPut[]>;
+  public putting(options: Uploader.Put<PutPrepare>): Promise<Uploader.RPut[]>;
+  public async putting(options: unknown): Promise<Uploader.RPut[]> {
+    if (!this.options.accessKeyId) throw new Error(fail(`AliUploader required "accessKeyId" option`));
+    if (!this.options.accessKeySecret) throw new Error(fail(`AliUploader required "accessKeySecret" option`));
+    if (!this.options.region && !this.options.endpoint) throw new Error(fail(`AliUploader required "region" or "endpoint" option`));
+
+    const objects: Uploader.Put<PutPrepare> = Array.isArray(options) ? { files: options } : (options as Uploader.Put<PutPrepare>);
+
+    if (!objects.files.length) return console.log(warn(`no upload, the list of files is empty`)), [];
+
+    objects.access = objects.access ?? '';
+    objects.retry = Math.round(Math.max(objects.retry ?? 0, 0));
+    objects.concurrency = Math.round(Math.max(objects.concurrency ?? 1, 1));
+    objects.accessPathProcessor ??= ({ file, name, access }) => {
+      return (name || path.posix.normalize(path.join(access || '', path.relative(process.cwd(), file)))).replace(/^\//, '');
+    };
+
+    objects.files = objects.files.map(it => {
+      if (typeof it === 'string') {
+        return { file: it, name: objects.accessPathProcessor?.({ name: '', file: it, access: objects.access! }) };
+      } else {
+        const access = it.access ?? objects.access ?? '';
+        const accessPathProcessor = (it.accessPathProcessor ?? objects.accessPathProcessor)!;
+        return { file: it.file, name: accessPathProcessor({ file: it.file, name: it.name, access })!, options: it.options };
+      }
+    });
+
+    // @ts-ignore
+    // retryMax 是 OSS Client 的属性，没有在 d.ts 文件描述，源码中翻出来的
+    const client = new Client({ ...this.options, retryMax: objects.retry });
+    const queue = new PQueue({ concurrency: objects.concurrency, autoStart: false });
+    objects.files.forEach(it => queue.add(() => this.#_upload(client, it.name!, it.file, it.options)), void 0);
+
+    const progressing = () => {
+      return new Promise<Uploader.RPut[]>(resolve => {
+        let completed = 0;
+        const total = queue.size;
+        const results: Uploader.RPut[] = [];
+
+        queue.on('completed', (result: Uploader.RPut) => {
+          completed += 1;
+          results.push(result);
+          objects.puttingProgress?.(completed, total, result);
+          completed === total && resolve(results);
+        });
+        queue.start();
+      });
+    };
+
+    return await progressing();
   }
 
-  async #upload(client: Client, options: UploaderPutHandle<Client.PutObjectOptions>): Promise<UploaderUploaded> {
-    const { file, root, name: filename, ...opts } = { root: '', ...options };
-    const name = this.bucketify({ cwd: this.#_options.cwd!, file, root, name: filename });
-
+  async #_upload(client: Client, name: string, file: string, options?: PutObjectOptions) {
     // FIX: 什么时候 ali-oss 依赖的 urllib 从 2.41.0 升级了，什么时候去掉这个 warn 覆盖
     // 主要是这里了：https://github.com/node-modules/urllib/blob/2.41.0/lib/urllib.js#L513
     const primitive = console.warn;
     console.warn = (..._args: any[]) => {};
 
-    const result = await client
-      .put(name, file, opts)
+    const result: Uploader.RPut = await client
+      .put(name, file, options)
       .then(response => ({ file, name: response.name, link: response.url, error: false }))
-      .catch(error => {
-        silent(red(error));
-        warn(yellow(`AliUploader failed to upload file "${file}"`));
-        return { file, name: name.replace(/^\//, ''), link: '', error: true };
-      });
+      .catch(error => ({ file, name, link: '', error }));
 
     // 还原 warn 覆盖
     console.warn = primitive;
     return result;
   }
 
-  public async putting(file: string): Promise<void | UploaderUploaded>;
-  public async putting(files: string[]): Promise<void | UploaderUploaded[]>;
-  public async putting(object: UploaderPutHandle<Client.PutObjectOptions>): Promise<void | UploaderUploaded>;
-  public async putting(objects: UploaderPutHandle<Client.PutObjectOptions>[]): Promise<void | UploaderUploaded[]>;
-  public async putting(value: unknown): Promise<any> {
-    if (!this.#_options.accessKeyId) return fail(italic(red(`AliUploader required ${inverse('accessKeyId')} option`)));
-    if (!this.#_options.accessKeySecret) return fail(italic(red(`AliUploader required ${inverse('accessKeySecret')} option`)));
-    if (!this.#_options.region && !this.#_options.endpoint) return fail(italic(red(`AliUploader required ${inverse('region')} or ${inverse('endpoint')} option`)));
-
-    const multiple = Array.isArray(value);
-    const objects: UploaderPutHandle<Client.PutObjectOptions>[] = (multiple ? value : [value]).map(it => (typeof it === 'string' ? { file: it } : it));
-    objects.forEach(o => silent(`${inverse(yellow('OSS'))} Found file: ${gray(o.file)}`));
-    if (objects.length) {
-      const { cwd: _, root, retry: __, concurrency, ...options } = this.#_options;
-      const client = new Client(options);
-      const queue = new PQueue({ concurrency, autoStart: false });
-      objects.forEach(it => (queue.add(() => this.#upload(client, { root: it.root || root, ...it })), void 0));
-      const result = await this.progressing('OSS', queue);
-      return multiple ? result : result?.[0];
-    } else {
-      warn(yellow(`AliUploader is not running and no files have been uploaded`));
-    }
+  #_timeout(value: Uploader.Value<Options, 'timeout'>) {
+    const data = typeof value === 'string' ? ms(value) : value;
+    this.property('timeout', Math.round(Math.max(data || 0, 0)));
   }
 
-  public override setOptions(options: Partial<UploaderOptions<AliUploaderOptions>> = {}) {
-    this.#_options = { cwd: process.cwd(), root: '', region: 'oss-cn-hangzhou', retry: 0, retryMax: 0, concurrency: 1, timeout: 60000, ...this.#_options, ...options };
+  #_region(value: Uploader.Value<Options, 'region'>) {
+    const endpoint = new AliEndpoint();
+    const hasRegion = Object.keys(endpoint.data).includes(value || '');
+    if (!hasRegion) return console.log(warn(`"${value}" not in AliUploader region/endpoint`));
+    this.property('region', value);
+    endpoint.has(this.get('endpoint') || '') && this.property('endpoint', endpoint.get(value!, this.get('internal')!));
+  }
 
-    const region = this.#_options.region || 'oss-cn-hangzhou';
-    const retry = Math.floor(this.#_options.retry || this.#_options.retryMax || 0);
-    const concurrency = Math.floor(this.#_options.concurrency || 1);
+  #_internal(value: Uploader.Value<Options, 'internal'>) {
+    this.property('internal', Boolean(value));
+    this.property('endpoint', new AliEndpoint().get(this.get('region')!, Boolean(value)));
+  }
 
-    this.#_options.region = region;
-    this.#_options.endpoint ||= this.#_endpoint.get(region, Boolean(this.#_options.internal));
-    this.#_options.retry = this.#_options.retryMax = retry < 0 ? 0 : retry;
-    this.#_options.concurrency = concurrency < 1 ? 1 : cpus < concurrency ? cpus : concurrency;
+  #_endpoint(value: Uploader.Value<Options, 'endpoint'>) {
+    this.property('endpoint', value ? value : new AliEndpoint().get(this.get('region')!, this.get('internal')!));
   }
 }

@@ -1,41 +1,33 @@
-import path from 'node:path';
+import { getProperty, setProperty } from 'dot-prop';
 
-import PQueue from 'p-queue';
-import { SingleBar } from 'cli-progress';
-import { green, yellow, magenta, inverse } from 'picocolors';
+export abstract class Uploader<S extends Uploader.Struct, P extends Uploader.Struct> {
+  #_options: S = {} as any;
+  #_ensures: { [name in Uploader.Keys<S>]?: (value: Uploader.Value<S, Uploader.Keys<S>>) => void } = {};
 
-import { unixify } from '@utils/unixify';
-
-export abstract class Uploader<Arg, Endpoint extends EndpointProcessor> {
-  public abstract get endpoint(): Endpoint;
-
-  public abstract setOptions(options?: Partial<UploaderOptions<Arg>>): void;
-
-  protected bucketify(options: { cwd: string; file: string; root?: string; name?: string | ((options: { file: string; cwd: string; root: string }) => string) }) {
-    const { cwd, file, root = '', name: filename } = options;
-    return !filename ? path.posix.join(root.replace(/\\/g, '/'), unixify(cwd, file)) : typeof filename === 'string' ? filename : filename({ file, cwd: cwd, root });
+  protected constructor(options: Partial<S>) {
+    this.#_options = { ...options } as any;
   }
 
-  protected async progressing(method: string, queue: PQueue): Promise<UploaderUploaded[]> {
-    return new Promise<UploaderUploaded[]>(resolve => {
-      const progress = new SingleBar({
-        format: `${inverse(magenta('[OSU]'))} ${yellow(method)} | ${green('{bar}')} | {percentage}% | {value}/{total} files uploaded`,
-        barCompleteChar: '\u2588',
-        barIncompleteChar: '\u2591',
-        hideCursor: true
-      });
+  public get options() {
+    return { ...this.#_options };
+  }
 
-      let completed = 0;
-      const total = queue.size;
-      const results: UploaderUploaded[] = [];
+  public set<K extends Uploader.Keys<S>>(prop: K, value: Uploader.Value<S, K>): this {
+    return typeof this.#_ensures?.[prop] === 'function' ? this.#_ensures[prop]!(value) : this.property(prop, value), this;
+  }
 
-      progress.start(total, completed);
-      queue.on('completed', (result: UploaderUploaded) => {
-        results.push(result);
-        progress.update((completed += 1));
-        completed === total && (progress.stop(), resolve(results));
-      });
-      queue.start();
-    });
+  public get<K extends Uploader.Keys<S>>(prop: K, defaultValue?: Uploader.RValue<S, K>): Uploader.Value<S, K> {
+    return getProperty(this.#_options, prop, defaultValue);
+  }
+
+  public abstract putting(files: string[]): Promise<Uploader.RPut[]>;
+  public abstract putting(options: Uploader.Put<P>): Promise<Uploader.RPut[]>;
+
+  protected ensure<K extends Uploader.Keys<S>>(prop: K, fn: (value: Uploader.Value<S, K>) => void) {
+    (this.#_ensures as any)[prop] = fn.bind(this);
+  }
+
+  protected property<K extends Uploader.Keys<S>>(prop: K, value: Uploader.Value<S, K>) {
+    setProperty(this.#_options, prop, value);
   }
 }
