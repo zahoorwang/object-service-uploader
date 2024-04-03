@@ -23,10 +23,10 @@ export function commandify() {
     .configureHelp(configure)
     .requiredOption('-f, --file <globify...>', 'find objects that will to be uploaded, support glob format')
     .addOption(new Option('--exclude <globify...>', 'exclude items that do not need to be uploaded').env('OSU_COS_EXCLUDE'))
-    .addOption(new Option('--access <string>', 'the bucket access root').env('OSU_COS_ACCESS'))
-    .addOption(new Option('--access-key-id <string>', 'access id you create').env('OSU_COS_ACCESS_KEY_ID'))
-    .addOption(new Option('--access-key-secret <string>', 'access secret you create').env('OSU_COS_ACCESS_KEY_SECRET'))
+    .addOption(new Option('--secret-id <string>', 'access id you create').env('OSU_COS_SECRET_ID'))
+    .addOption(new Option('--secret-key <string>', 'access secret you create').env('OSU_COS_SECRET_KEY'))
     .addOption(new Option('--bucket <string>', 'the bucket you want to access').env('OSU_COS_BUCKET'))
+    .addOption(new Option('--access <string>', `the bucket you want to access's root path`).env('OSU_COS_ACCESS'))
     .addOption(new Option('--region <string>', 'the bucket data region location').default('ap-beijing').env('OSU_COS_REGION'))
     .addOption(new Option('--endpoint <string>', 'COS region domain. It takes priority over region').env('OSU_COS_ENDPOINT'))
     .addOption(new Option('--secure', 'instruct COS client to use HTTPS (secure: true) or HTTP (secure: false) protocol').default(true).env('OSU_COS_SECURE'))
@@ -36,15 +36,18 @@ export function commandify() {
     .addOption(new Option('--progress <mode>', 'uploading progress display mode').default('list').choices(['list', 'bar']).env('OSU_COS_PROGRESS'))
     .action(async (opts: any) => {
       const { file, exclude, access, retry, progress, concurrency, ...options } = opts;
+
       const errors: Uploader.RPut[] = [];
       const files = await globby(file, { ignore: exclude, onlyFiles: true, absolute: true });
       const bar: SingleBar | undefined = progress === 'bar' ? single(name) : undefined;
 
+      console.log(options);
       printf('');
+      return;
 
       await new Uploader({
-        SecretId: options.accessKeyId || '',
-        SecretKey: options.accessKeySecret || '',
+        SecretId: options.secretId || '',
+        SecretKey: options.secretKey || '',
         Protocol: options.secure ? 'https' : 'http',
         Timeout: options.timeout,
         FileParallelLimit: concurrency,
