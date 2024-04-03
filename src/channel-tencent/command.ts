@@ -41,9 +41,7 @@ export function commandify() {
       const files = await globby(file, { ignore: exclude, onlyFiles: true, absolute: true });
       const bar: SingleBar | undefined = progress === 'bar' ? single(name) : undefined;
 
-      console.log(options);
       printf('');
-      return;
 
       await new Uploader({
         SecretId: options.secretId || '',
