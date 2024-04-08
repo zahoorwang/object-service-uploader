@@ -11,6 +11,8 @@ import { program } from 'commander';
 
 import pkg from '../package.json' assert { type: 'json' };
 
+import { dirname } from './core/dirname';
+
 import { lsify } from './cli/ls';
 import { regionify } from './cli/region';
 import { colorintro, configure, headline, is } from './cli/utils';
@@ -25,7 +27,7 @@ function env() {
 
 async function subcommand() {
   if (subs?.length) return;
-  const cwd = import.meta.dirname;
+  const cwd = dirname(import.meta.url);
   const files = await globby(['channel-*/command.*'], { cwd, absolute: true, onlyFiles: true });
   const format = (file: string) => import(file).then(module => (is(module) ? { ...module, file: file.replace(cwd, '').replace(/^\/?/, '').replace(/\.js$/, '') } : (null as any))).catch(() => null as any);
   subs = (await Promise.all<CommandModule>(files.map(file => format(file)))).filter(Boolean);

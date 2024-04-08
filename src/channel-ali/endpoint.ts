@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 
 import { load as htmlify } from 'cheerio';
 
+import { dirname } from '../core/dirname';
 import { Endpoint } from '../core/endpoint';
 import { jsonify, tableify } from '../core/formatter';
 
@@ -12,7 +13,7 @@ export class AliEndpoint extends Endpoint<Ali.Struct> implements Endpoint<Ali.St
     if (AliEndpoint.#_inst) return AliEndpoint.#_inst;
 
     super(
-      resolve(import.meta.dirname, '../../data', 'ali.json'), //
+      resolve(dirname(import.meta.url), '../../data', 'ali.json'), //
       'https://help.aliyun.com/zh/oss/user-guide/regions-and-endpoints' //
     );
     return (AliEndpoint.#_inst = this);

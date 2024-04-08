@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 
 import { load as htmlify } from 'cheerio';
 
+import { dirname } from '../core/dirname';
 import { Endpoint } from '../core/endpoint';
 import { jsonify, tableify } from '../core/formatter';
 
@@ -12,7 +13,7 @@ export class TencentEndpoint extends Endpoint<Tencent.Struct> implements Endpoin
     if (TencentEndpoint.#_inst) return TencentEndpoint.#_inst;
 
     super(
-      resolve(import.meta.dirname, '../../data', 'tencent.json'), //
+      resolve(dirname(import.meta.url), '../../data', 'tencent.json'), //
       'https://cloud.tencent.com/document/product/436/6224' //
     );
     return (TencentEndpoint.#_inst = this);
